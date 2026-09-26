@@ -1,5 +1,37 @@
 package main
 
+import (
+	"log"
+	"os"
+
+	"github.com/danielakinremi1-dev/RSS_feed_aggregator/internal/config"
+)
+
+type state struct {
+	cfg *config.Config
+}
+
 func main() {
+
+	cfg, err := config.Read()
+	if err != nil {
+		log.Fatalf("error reading config: %v", err)
+	}
+
+	programState := &state{cfg: &cfg}
+	mainCommands := commands{registeredCommands: map[string]func(*state, command) error{}}
+	mainCommands.register("login", handlerLogin)
+
+	if len(os.Args) < 2 {
+		log.Fatal("Usage: cli <command> [args...]")
+	}
+
+	cmdName := os.Args[1]
+	cmdArgs := os.Args[2:]
+
+	err = mainCommands.run(programState, command{Name: cmdName, Args: cmdArgs})
+	if err != nil {
+		log.Fatal(err)
+	}
 
 }

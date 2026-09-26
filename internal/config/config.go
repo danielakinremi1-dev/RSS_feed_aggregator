@@ -3,15 +3,16 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 type Config struct {
-	Dburl    string `json:"db_url"`
-	Username string `json:"current_user_name"`
+	DBURL           string `json:"db_url"`
+	CurrentUserName string `json:"current_user_name"`
 }
 
-func (c Config) SetUser(username string) error {
-	c.Username = username
+func (c Config) SetUser(userName string) error {
+	c.CurrentUserName = userName
 	if err := write(c); err != nil {
 		return err
 	}
@@ -19,48 +20,50 @@ func (c Config) SetUser(username string) error {
 }
 
 func Read() (Config, error) {
-	configPath, err := getConfigFilePath()
-	if err != nil {
-		return Config{}, err
-
-	}
-
-	data, err := os.ReadFile(configPath)
+	fullPath, err := getConfigFilePath()
 	if err != nil {
 		return Config{}, err
 	}
 
-	configData := Config{}
-	err = json.Unmarshal(data, &configData)
+	file, err := os.Open(fullPath)
+	if err != nil {
+		return Config{}, err
+	}
+	defer file.Close()
+
+	decoder := json.NewDecoder(file)
+	cfg := Config{}
+	err = decoder.Decode(&cfg)
 	if err != nil {
 		return Config{}, err
 	}
 
-	return configData, nil
-
+	return cfg, nil
 }
 
 func getConfigFilePath() (string, error) {
-	homePath, err := os.UserHomeDir()
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	configPath := homePath + "/" + configFileName
-	return configPath, nil
+	fullPath := filepath.Join(home, configFileName)
+	return fullPath, nil
 }
 
 func write(cfg Config) error {
-	configPath, err := getConfigFilePath()
+	fullPath, err := getConfigFilePath()
 	if err != nil {
 		return err
 	}
 
-	cfgData, err := json.Marshal(cfg)
+	file, err := os.Create(fullPath)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	err = os.WriteFile(configPath, []byte(cfgData), 0644)
+	encoder := json.NewEncoder(file)
+	err = encoder.Encode(cfg)
 	if err != nil {
 		return err
 	}
