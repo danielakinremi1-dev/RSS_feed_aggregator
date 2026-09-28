@@ -1,14 +1,18 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"os"
 
 	"github.com/danielakinremi1-dev/RSS_feed_aggregator/internal/config"
+	"github.com/danielakinremi1-dev/RSS_feed_aggregator/internal/database"
+	_ "github.com/lib/pq"
 )
 
 type state struct {
 	cfg *config.Config
+	db  *database.Queries
 }
 
 func main() {
@@ -18,9 +22,22 @@ func main() {
 		log.Fatalf("error reading config: %v", err)
 	}
 
-	programState := &state{cfg: &cfg}
+	db, err := sql.Open("postgres", cfg.DBURL)
+	if err != nil {
+		log.Fatalf("error connecting to database: %v", err)
+	}
+
+	dbQueries := database.New(db)
+
+	programState := &state{cfg: &cfg, db: dbQueries}
 	mainCommands := commands{registeredCommands: map[string]func(*state, command) error{}}
 	mainCommands.register("login", handlerLogin)
+	mainCommands.register("register", handlerRegister)
+	mainCommands.register("reset", handlerReset)
+	mainCommands.register("users", handlerUsers)
+	mainCommands.register("agg", handlerAgg)
+	mainCommands.register("addfeed", handlerAddFeed)
+	mainCommands.register("feeds", handlerFeeds)
 
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: cli <command> [args...]")
