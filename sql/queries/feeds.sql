@@ -11,6 +11,12 @@ VALUES (
 )
 RETURNING *;
 
+-- name: GetFeedID :one
+
+SELECT id
+FROM feeds
+WHERE url = $1 LIMIT 1;
+
 -- name: GetFeeds :many
 
 SELECT feeds.name, feeds.url, 
