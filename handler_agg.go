@@ -1,21 +1,28 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
+	"time"
 )
 
 func handlerAgg(s *state, cmd command) error {
 
-	url := "https://www.wagslane.dev/index.xml"
-
-	RSSFeed, err := fetchFeed(context.Background(), url)
-	if err != nil {
-		fmt.Println("Error fetching RSS feeds")
-		os.Exit(1)
+	if len(cmd.Args) < 1 {
+		return fmt.Errorf("Insufficient command arguments given for aggregating feeds")
 	}
 
-	fmt.Printf("%+v\n", *RSSFeed)
+	time_between_reqs, err := time.ParseDuration(cmd.Args[0])
+	if err != nil {
+		fmt.Println("Error parsing duration between aggregation requests")
+		return err
+	}
+
+	fmt.Printf("Collecting feeds every %v\n", time_between_reqs)
+
+	ticker := time.NewTicker(time_between_reqs)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
+
 	return nil
 }
