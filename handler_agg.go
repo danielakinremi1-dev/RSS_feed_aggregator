@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -11,18 +12,15 @@ func handlerAgg(s *state, cmd command) error {
 		return fmt.Errorf("Insufficient command arguments given for aggregating feeds")
 	}
 
-	time_between_reqs, err := time.ParseDuration(cmd.Args[0])
+	timeBetweenRequests, err := time.ParseDuration(cmd.Args[0])
 	if err != nil {
-		fmt.Println("Error parsing duration between aggregation requests")
-		return err
+		return fmt.Errorf("invalid duration: %w", err)
 	}
 
-	fmt.Printf("Collecting feeds every %v\n", time_between_reqs)
+	log.Printf("Collecting feeds every %s...", timeBetweenRequests)
 
-	ticker := time.NewTicker(time_between_reqs)
+	ticker := time.NewTicker(timeBetweenRequests)
 	for ; ; <-ticker.C {
 		scrapeFeeds(s)
 	}
-
-	return nil
 }

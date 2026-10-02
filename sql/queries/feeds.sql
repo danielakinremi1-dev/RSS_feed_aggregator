@@ -27,8 +27,8 @@ INNER JOIN users on users.id = feeds.user_id;
 -- name: MarkFeedFetched :exec
 
 UPDATE feeds
-SET updated_at = $1, last_fetched_at = $2
-WHERE id = $3;
+SET updated_at = NOW(), last_fetched_at = NOW()
+WHERE id = $1;
 
 -- name: GetNextFeedToFetch :one
 

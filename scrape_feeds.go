@@ -3,70 +3,100 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
+	"errors"
 	"log"
 	"time"
 
 	"github.com/danielakinremi1-dev/RSS_feed_aggregator/internal/database"
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 )
 
-func scrapeFeeds(s *state) error {
+func scrapeFeeds(s *state) {
 
 	nextFeed, err := s.db.GetNextFeedToFetch(context.Background())
 	if err != nil {
-		fmt.Println("Error fetching next feed to scrape")
-		return err
+		log.Println("Couldn't get next feeds to fetch", err)
+		return
 	}
+	log.Println("Found a feed to fetch!")
 
-	currentTime := sql.NullTime{
-		Time:  time.Now(),
-		Valid: true,
-	}
-
-	queryArgs := database.MarkFeedFetchedParams{
-		UpdatedAt:     time.Now(),
-		LastFetchedAt: currentTime,
-		ID:            nextFeed.ID,
-	}
-
-	err = s.db.MarkFeedFetched(context.Background(), queryArgs)
+	err = s.db.MarkFeedFetched(context.Background(), nextFeed.ID)
 	if err != nil {
-		fmt.Println("Error marking feed as fetched")
-		return err
+		log.Printf("Couldn't mark feed %s fetched: %v\n", nextFeed.Name, err)
+		return
 	}
 
 	RSSFeed, err := fetchFeed(context.Background(), nextFeed.Url)
 	if err != nil {
-		fmt.Println("Error fetching online feed data")
-		return err
+		log.Printf("Couldn't collect feed %s: %v\n", nextFeed.Name, err)
+		return
 	}
 
-	itemPublishedTime := sql.NullTime{
-		Time:  time.Now(),
-		Valid: true,
-	}
+	for i, item := range RSSFeed.Channel.Item {
 
-	itemDescription := sql.NullString{
-		Time:  time.Now(),
-		Valid: true,
-	}
+		if len(item.Link) < 1 {
+			log.Printf(" Post #%v from RSS feed %v save skipped : No valid URL\n", i, nextFeed.Name)
+			continue
+		}
 
-	for _, item := range RSSFeed.Channel.Item {
-		post := database.CreatePostParams{
+		itemPublished := sql.NullTime{
+			Valid: true,
+		}
+
+		publishTime, err := time.Parse(time.RFC1123Z, item.PubDate)
+		if err == nil {
+			itemPublished.Time = publishTime
+		} else {
+			publishTime, err = time.Parse(time.RFC1123, item.PubDate)
+			if err == nil {
+				itemPublished.Time = publishTime
+			} else {
+				publishTime, err = time.Parse(time.RFC3339, item.PubDate)
+				if err == nil {
+					itemPublished.Time = publishTime
+				} else {
+					itemPublished.Valid = false
+				}
+			}
+		}
+
+		itemDescription := sql.NullString{
+			String: item.Description,
+			Valid:  true,
+		}
+		if len(item.Description) < 1 {
+			itemDescription.Valid = false
+		}
+
+		itemTitle := sql.NullString{
+			String: item.Title,
+			Valid:  true,
+		}
+		if len(item.Title) < 1 {
+			itemTitle.Valid = false
+		}
+
+		queryArgs := database.CreatePostParams{
 			ID:          uuid.New(),
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
-			Title:       item.Title,
+			Title:       itemTitle,
 			Url:         item.Link,
-			Description: sql.NullString,
-			PublishedAt: item.PubDate,
-			FeedID:      uuid.New(),
+			Description: itemDescription,
+			PublishedAt: itemPublished,
+			FeedID:      nextFeed.ID,
 		}
 
+		_, err = s.db.CreatePost(context.Background(), queryArgs)
+		if err != nil {
+			var existErr *pq.Error
+			if !errors.As(err, &existErr) || existErr.Code != "23505" {
+				log.Printf("Error creating Post #%v: %v\n", i, err)
+				continue
+			}
+		}
+		log.Printf(" Post #%v from RSS feed %v saved!\n", i, nextFeed.Name)
 	}
 
-	log.Printf("Feed %s collected, %v posts found", nextFeed.Name, len(RSSFeed.Channel.Item))
-
-	return nil
 }
