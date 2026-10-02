@@ -29,10 +29,13 @@ func handlerBrowse(s *state, cmd command, user database.User) error {
 		return fmt.Errorf("Error getting user posts: %w", err)
 	}
 
+	fmt.Printf("Found %d posts for user %s:\n", len(posts), user.Name)
 	for _, post := range posts {
-
-		fmt.Printf("Post: %v\n Description: %v\n Published at %v from url %v",
-			post.Title, post.Description, post.PublishedAt, post.Url)
+		fmt.Printf("%s from %s\n", post.PublishedAt.Time.Format("Mon Jan 2"), post.FeedName)
+		fmt.Printf("--- %s ---\n", post.Title.String)
+		fmt.Printf("    %v\n", post.Description.String)
+		fmt.Printf("Link: %s\n", post.Url)
+		fmt.Println("=====================================")
 	}
 
 	return nil

@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/danielakinremi1-dev/RSS_feed_aggregator/internal/database"
 	"github.com/google/uuid"
-	"github.com/lib/pq"
 )
 
 func scrapeFeeds(s *state) {
@@ -90,13 +89,12 @@ func scrapeFeeds(s *state) {
 
 		_, err = s.db.CreatePost(context.Background(), queryArgs)
 		if err != nil {
-			var existErr *pq.Error
-			if !errors.As(err, &existErr) || existErr.Code != "23505" {
-				log.Printf("Error creating Post #%v: %v\n", i, err)
+			if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 				continue
 			}
+			log.Printf("Couldn't create post: %v", err)
+			continue
 		}
-		log.Printf(" Post #%v from RSS feed %v saved!\n", i, nextFeed.Name)
+		log.Printf("Feed %s collected, %v posts found", nextFeed.Name, len(RSSFeed.Channel.Item))
 	}
-
 }
